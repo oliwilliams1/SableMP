@@ -8,5 +8,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Add SableUI
 add_subdirectory(vendor/SableUI)
 
-add_executable(SableMP src/main.cpp)
-target_link_libraries(SableMP PRIVATE SableUI)
+# Add Media Library
+add_subdirectory(vendor/MediaLibrary)
+
+add_executable(SableMP
+	"src/main.cpp"
+	"include/components/PlaylistView.h"
+)
+
+target_include_directories(SableMP PRIVATE "include")
+
+target_link_libraries(SableMP PRIVATE SableUI MediaLibrary)
