@@ -1,4 +1,6 @@
-#include <SableUI/SableUI.h>
+﻿#include <SableUI/SableUI.h>
+#include <MediaLibrary/MediaLibrary.h>
+#include <algorithm>
 
 using namespace SableUI;
 using namespace SableUI::Style;
@@ -18,91 +20,125 @@ class PlaylistView : public BaseComponent
 public:
 	PlaylistView()
 	{
-		albums =
+		const std::vector<SableML::Track>* tracks = SableML::Library::GetInstance().GetTracks();
+
+		struct AlbumKey
 		{
-			{
-				"yeule",
-				"Ending",
-				"2014",
-				rgb(73, 91, 122),
-				{
-					"Ending",
-					"Healing",
-					"Impure",
-					"Intermission",
-					"Thoughts"
-				}
-			},
+			std::string album;
+			std::string albumArtist;
 
+			bool operator==(const AlbumKey& other) const
 			{
-				"KISS OF LIFE",
-				"Midas Touch",
-				"2024",
-				rgb(205, 142, 64),
-				{
-					"Midas Touch",
-					"Nothing"
-				}
-			},
-
-			{
-				"Laufey",
-				"Everything I Know About Love",
-				"2022",
-				rgb(92, 36, 36),
-				{
-					"Fragile",
-					"Beautiful Stranger",
-					"Valentine",
-					"Above the Chinese Restaurant",
-					"Dear Soulmate",
-					"What Love Will Do to You",
-					"I’ve Never Been in Love Before",
-					"Just Like Chet",
-					"Everything I Know About Love",
-					"Falling Behind",
-					"Hi",
-					"Dance With You Tonight",
-					"Slow Down",
-					"Lucky for Me",
-					"Questions for the Universe"
-				}
-			},
-
-			{
-				"tripleS",
-				U"EVOlution <⟡>",
-				"2023",
-				rgb(84, 104, 78),
-				{
-					U"⟡",
-					"Invincible",
-					"Rhodanthe",
-					"Heavy Metal Wings",
-					U"미열 37.5",
-					"Moto Princess",
-					"Oui",
-					"Enhanced Flower"
-				}
-			},
-
-			{
-				"LOONA",
-				"[12:00]",
-				"2020",
-				rgb(104, 32, 78),
-				{
-					"12:00",
-					"Why Not?",
-					U"목소리 (Voice)",
-					U"기억해 (Fall Again)",
-					"Universe",
-					U"숨바꼭질 (Hide & Seek)",
-					"OOPS!",
-					U"Star (목소리 English ver.)"
-				}
+				return album == other.album &&
+					albumArtist == other.albumArtist;
 			}
 		};
+
+		struct AlbumKeyHasher
+		{
+			size_t operator()(const AlbumKey& k) const
+			{
+				return std::hash<std::string>()(k.album) ^
+					(std::hash<std::string>()(k.albumArtist) << 1);
+			}
+		};
+
+		struct AlbumGroup
+		{
+			const SableML::Track* representative = nullptr;
+			std::vector<const SableML::Track*> tracks;
+		};
+
+		std::unordered_map<AlbumKey, AlbumGroup, AlbumKeyHasher> grouped;
+
+		for (const SableML::Track& track : *tracks)
+		{
+			const auto& md = track.metadata;
+
+			std::string album = md.album.empty() ? "Unknown Album" : md.album;
+
+			std::string albumArtist =
+				!md.albumArtist.empty() ? md.albumArtist :
+				!md.artist.empty() ? md.artist :
+				"Unknown Artist";
+
+			AlbumKey key
+			{
+				album,
+				albumArtist
+			};
+
+			auto& group = grouped[key];
+
+			if (!group.representative)
+				group.representative = &track;
+
+			group.tracks.push_back(&track);
+		}
+
+		std::vector<std::pair<AlbumKey, AlbumGroup*>> sortedAlbums;
+
+		for (auto& [key, group] : grouped)
+			sortedAlbums.push_back({ key, &group });
+
+		std::sort(sortedAlbums.begin(), sortedAlbums.end(),
+			[](const auto& a, const auto& b)
+			{
+				return a.first.album < b.first.album;
+			});
+
+		for (auto& [key, group] : sortedAlbums)
+		{
+			std::sort(group->tracks.begin(), group->tracks.end(),
+				[](const SableML::Track* a, const SableML::Track* b)
+				{
+					const auto& ma = a->metadata;
+					const auto& mb = b->metadata;
+
+					if (ma.discNumber != mb.discNumber)
+						return ma.discNumber < mb.discNumber;
+
+					if (ma.trackNumber != mb.trackNumber)
+						return ma.trackNumber < mb.trackNumber;
+
+					return ma.title < mb.title;
+				});
+
+			const auto& rep = group->representative->metadata;
+
+			Album album;
+
+			album.artist =
+				!rep.albumArtist.empty() ? rep.albumArtist :
+				!rep.artist.empty() ? rep.artist :
+				"Unknown Artist";
+
+			album.album =
+				!rep.album.empty() ? rep.album :
+				"Unknown Album";
+
+			album.year =
+				rep.year != 0 ?
+				SableString::Format("%u", rep.year) :
+				"----";
+
+			album.cover = rgb(
+				60 + (albums.size() * 23) % 120,
+				60 + (albums.size() * 47) % 120,
+				60 + (albums.size() * 71) % 120);
+
+			for (const SableML::Track* track : group->tracks)
+			{
+				const auto& md = track->metadata;
+
+				album.tracks.push_back(
+					!md.title.empty() ?
+					md.title :
+					"Unknown Track");
+			}
+
+			albums.push_back(std::move(album));
+		}
 	}
 
 	void Layout() override

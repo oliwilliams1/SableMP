@@ -17,11 +17,28 @@
 
 
 #include <MediaLibrary/MediaLibrary.h>
+#include <components/PlaylistView.h>
 
 int main()
 {
-	SableML::Library library;
-	library.ScanDirectory("D:/Music/Library/TripleS/");
+	SableML::Library::Initialise();
+	SableML::Library& library = SableML::Library::GetInstance();
+
+	library.ScanDirectory("C:/Users/Oli/Music/Library/");
+
+	SableUI::RegisterComponent<PlaylistView>("PlaylistView");
+
+	SableUI::InitialisePrimaryWindow("SableMP", 1000, 700);
+	
+	Panel("PlaylistView");
+	
+	while (SableUI::WaitEvents())
+		SableUI::Render();
+	
+	SableUI::Shutdown();
+
+
+	SableML::Library::Shutdown();
 
 	return 0;
 }

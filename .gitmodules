@@ -1,3 +1,6 @@
 [submodule "vendor/SableUI"]
 	path = vendor/SableUI
 	url = https://github.com/oliwilliams1/SableUI
+[submodule "vendor/MediaLibrary"]
+	path = vendor/MediaLibrary
+	url = https://github.com/oliwilliams1/MediaLibrary
